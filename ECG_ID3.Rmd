@@ -1,0 +1,172 @@
+---
+title: "ECG ID 3"
+author: "Guim Arbona Ricart, 1632130"
+date: "2025-03-17"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+### 1) Importar los datos ECG
+```{r}
+install.packages("R.matlab")
+library(R.matlab)
+data<-readMat("ECGPCG0003.mat")
+View(data)
+str(data)
+ECG<-data$ECG[1,]
+```
+
+
+
+### 2) Picos R
+```{r}
+installed.packages("pracma")
+library(pracma)
+
+```
+El umbral mínimo se basa en la amplitud de los picos R.
+
+
+```{r}
+max(ECG)
+threshold<-mean(ECG)+sd(ECG)*1.5 #lo calculo basado en el rango de la señal
+picos<-findpeaks(ECG,nups=1,ndowns =1,minpeakheight = threshold)
+```
+
+```{r}
+plot(ECG,type="l")
+points(picos[,2],ECG[picos[,2]],col="red",pch=19)  #segona col es el temps en el que hi ha el temps
+```
+
+
+
+
+```{r}
+ECG_inv<- -ECG
+picos_inv<-findpeaks(ECG_inv,nups=1,ndowns = 1,minpeakheight = threshold)
+plot(ECG_inv,type="l")
+points(picos_inv[,2],ECG_inv[picos_inv[,2]],col="red",pch=19)  #segona col es el temps en el que hi ha el temps
+
+```
+
+
+
+### 3) Intervalos RR
+
+```{r}
+picos_R <- picos[, 2]
+RR_intervals <- diff(picos_R)  # Diferencia entre picos consecutivos
+
+
+```
+
+
+
+#### Visualizar los intervalos RR
+
+```{r}
+plot(RR_intervals, type = "o", col = "red", main = "RR Intervals", 
+     xlab = "Beat Number", ylab = "RR Interval")
+hist(RR_intervals, breaks = 20, col = "lightblue", main = "Distribution of RR Intervals", 
+     xlab = "RR Interval (s)", ylab = "Frequency")
+```
+
+
+#### Estadísticas de los intervalos
+```{r}
+mean_RR <- mean(RR_intervals)  # Promedio del intervalo RR
+sd_RR <- sd(RR_intervals)      # Desviación estándar
+
+
+list(mean_RR = mean_RR, sd_RR = sd_RR)
+```
+
+
+
+### 4) Valores anómalos
+
+```{r}
+Q1 <- quantile(RR_intervals, 0.25)  # Primer cuartil (Q1)
+Q3 <- quantile(RR_intervals, 0.75)  # Tercer cuartil (Q3)
+IQR_value <- Q3 - Q1  # Rango intercuartílico
+
+# Umbrales para detectar valores anómalos
+lower_bound <- Q1 - 1.5 * IQR_value
+upper_bound <- Q3 + 1.5 * IQR_value
+
+# Identificar anomalías
+anomalous_points <- which(RR_intervals < lower_bound | RR_intervals > upper_bound)
+
+# Graficar
+plot(RR_intervals, type = "o", col = "blue", main = "RR Intervals with Anomalies", 
+     xlab = "Beat Number", ylab = "RR Interval (s)")
+points(anomalous_points, RR_intervals[anomalous_points], col = "red", pch = 19)  # Anomalías en rojo
+
+```
+
+
+
+Detectar anomalías según la variación entre valores consecutivos.
+```{r}
+RR_diff <- abs(diff(RR_intervals))
+threshold <- median(RR_diff) + 3 * mad(RR_diff)  # Usamos MAD (desviación absoluta mediana)
+anomalous_points <- which(RR_diff > threshold) + 1  # Desplazamos en +1 por diff()
+
+# Graficar
+plot(RR_intervals, type = "o", col = "blue", main = "RR Intervals with Anomalies", 
+     xlab = "Beat Number", ylab = "RR Interval (s)")
+points(anomalous_points, RR_intervals[anomalous_points], col = "red", pch = 19)  # Anomalías en rojo
+
+```
+
+
+Outliers en series temporales con estacionalidad:
+```{r}
+install.packages("forecast")
+library(forecast)
+
+outliers <- tsoutliers(ts(RR_intervals))
+anomalous_points <- outliers$index  # Índices de valores anómalos
+
+plot(RR_intervals, type = "o", col = "blue", main = "RR Intervals with Anomalies", 
+     xlab = "Beat Number", ylab = "RR Interval (s)")
+points(anomalous_points, RR_intervals[anomalous_points], col = "red", pch = 19)  # Anomalías en rojo
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
